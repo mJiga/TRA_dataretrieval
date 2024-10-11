@@ -4,24 +4,31 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException
 
 import time
 
 class Script:
     def __init__(self, options):
+        """
+        Initializes the Script class with options for Selenium WebDriver.
+
+        Args:
+            options (dict): A dictionary containing configuration options such as download directory, district, program, and report.
+        """
         self.options = options
 
+        # Set up Chrome options for WebDriver
         chrome_options = webdriver.ChromeOptions()
         prefs = {
-            "download.default_directory": self.options['download_dir'],
-            "download.prompt_for_download": False,
-            "directory_upgrade": True,
-            "safebrowsing.enabled": True
+            "download.default_directory": self.options['download_dir'], # Directory for downloaded files
+            "download.prompt_for_download": False, # Do not prompt for downloads
+            "directory_upgrade": True, # Allow directory upgrades
+            "safebrowsing.enabled": True # Enable safe browsing
         }
         chrome_options.add_experimental_option("prefs", prefs)
         self.driver = webdriver.Chrome(options=chrome_options)
 
+        # Map of programs to their corresponding reports and required parameters
         self.program_report_map = {
             "STAAR 3-8": {
                 "Standard Constructed Response Summary": ['administration', 'grade', 'version'],
@@ -67,6 +74,13 @@ class Script:
         }
 
     def run(self):
+        
+        """
+        Executes the main script logic for downloading reports.
+
+        This includes navigating to the website, selecting district, program, and report,
+        handling dynamic parameters, and initiating the download.
+        """
         try:
             # Navigate to the website
             self.driver.get("https://txresearchportal.com/selections")
@@ -82,21 +96,31 @@ class Script:
             # Dynamically handle parameters based on the selected report
             self.handle_dynamic_parameters(self.options['report'], self.options['program'], self.options)
 
+            # Trigger the download process
             self.download()
 
         finally:
-            # Close the browser
-            time.sleep(5)
+            # Ensure the browser is closed after the operation
+            time.sleep(5)  # Wait for the download to complete
             self.driver.quit()
 
     def handle_dynamic_parameters(self, report, program, options):
+        """
+        Handles the dynamic selection of parameters based on the selected report and program.
+
+        Args:
+            report (str): The selected report.
+            program (str): The selected program.
+            options (dict): The options containing parameter values.
+        """
         if program in self.program_report_map and report in self.program_report_map[program]:
             required_params = self.program_report_map[program][report]
 
+            # Iterate through required parameters and invoke respective selection methods
             for param in required_params:
 
                 if param in options:
-                    method = getattr(self, f"select_{param}", None)
+                    method = getattr(self, f"select_{param}", None) # Call the selection method with the option value
 
                     if method:
                         method(options[param])
@@ -105,17 +129,23 @@ class Script:
                 else:
                     print(f"Parameter {param} not provided for {program}.")
 
-
-
     def select_district(self, district):
-        # Search and select district
+        """
+        Selects the specified district from the input field and clicks the checkbox.
+
+        Args:
+            district (str): The name of the district to select.
+        """
+
+        # Locate the district search input and enter the district name
         search_input = WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Enter a Campus or District Name or CDC code']"))
         )
+
         search_input.send_keys(district)
         search_input.send_keys(Keys.RETURN)
         
-        # Find the first checkbox
+        # Find and click the first checkbox corresponding to the district
         checkbox_selector = "span.MuiButtonBase-root.MuiCheckbox-root[aria-label^='Select district']"
         first_checkbox = WebDriverWait(self.driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, checkbox_selector))
@@ -153,6 +183,12 @@ class Script:
             print(f"Error selecting program: {e}")
 
     def select_report(self, report):
+        """
+        Selects the specified report from the available options.
+
+        Args:
+            report (str): The name of the report to select.
+        """
         try:
             # Wait for the report container to be present
             report_container = WebDriverWait(self.driver, 20).until(
@@ -183,6 +219,12 @@ class Script:
             print(f"Error selecting report '{report}': {str(e)}")
 
     def select_administration(self, administrations):
+        """
+        Selects the specified administration from the options.
+
+        Args:
+            administration (str): The administration value to select.
+        """
         try:
             # Find the 'Select the Administrations' section
             administrations_section = WebDriverWait(self.driver, 10).until(
@@ -213,9 +255,11 @@ class Script:
                         # For checkboxes, only click if not already checked
                         if not input_element.is_selected():
                             admin_option.click()
+                            time.sleep(1)
                     elif input_type == "radio":
                         # For radio buttons, always click to ensure selection
                         admin_option.click()
+                        time.sleep(1)
                     else:
                         print(f"Unexpected input type for {administration}: {input_type}")
                         continue
@@ -230,6 +274,12 @@ class Script:
             print(f"Error in select_administrations: {str(e)}")
 
     def select_grade(self, grades):
+        """
+        Selects the specified grade from the options.
+
+        Args:
+            grade (str): The grade value to select.
+        """
         try:
             # Find the 'Select the Grades' section
             grade_section = WebDriverWait(self.driver, 10).until(
@@ -260,9 +310,11 @@ class Script:
                         # For checkboxes, only click if not already checked
                         if not input_element.is_selected():
                             admin_option.click()
+                            time.sleep(1)
                     elif input_type == "radio":
                         # For radio buttons, always click to ensure selection
                         admin_option.click()
+                        time.sleep(1)
                     else:
                         print(f"Unexpected input type for {grade}: {input_type}")
                         continue
@@ -276,8 +328,14 @@ class Script:
         except Exception as e:
             print(f"Error in select_administrations: {str(e)}")
 
-    # DOES NOT WORK WITH 'STAAR'
+    # DOES NOT WORK WITH 'STAAR' AS OF NOWS
     def select_version(self, version):
+        """
+        Selects the specified version from the options.
+
+        Args:
+            subject (str): The version value to select.
+        """
         try:
             # Find the 'Select the Administrations' section
             version_section = WebDriverWait(self.driver, 10).until(
@@ -312,6 +370,12 @@ class Script:
             print(f"Error in select_version: {str(e)}")
 
     def select_subject(self, subjects):
+        """
+        Selects the specified subject from the options.
+
+        Args:
+            subject (str): The version subject to select.
+        """
         try:
             # Find the 'Select the Grades' section
             subject_section = WebDriverWait(self.driver, 10).until(
@@ -342,9 +406,11 @@ class Script:
                         # For checkboxes, only click if not already checked
                         if not input_element.is_selected():
                             admin_option.click()
+                            time.sleep(1)
                     elif input_type == "radio":
                         # For radio buttons, always click to ensure selection
                         admin_option.click()
+                        time.sleep(1)
                     else:
                         print(f"Unexpected input type for {subject}: {input_type}")
                         continue
@@ -360,6 +426,12 @@ class Script:
 
 
     def select_cluster(self, clusters):
+        """
+        Selects the specified cluster from the options.
+
+        Args:
+            subject (str): The cluster value to select.
+        """
         try:
             # Find the 'Select the Cluster' section
             cluster_section = WebDriverWait(self.driver, 10).until(
@@ -390,9 +462,11 @@ class Script:
                         # For checkboxes, only click if not already checked
                         if not input_element.is_selected():
                             admin_option.click()
+                            time.sleep(1)
                     elif input_type == "radio":
                         # For radio buttons, always click to ensure selection
                         admin_option.click()
+                        time.sleep(1)
                     else:
                         print(f"Unexpected input type for {cluster}: {input_type}")
                         continue
@@ -407,6 +481,9 @@ class Script:
             print(f"Error in select_clusters: {str(e)}")
 
     def download(self):
+        """
+        Initiates the download of the selected report.
+        """
         try:
             # Find the download button (use the class name from your example)
             download_button = self.driver.find_element(By.CLASS_NAME, "MuiRequestButton-root")
@@ -419,18 +496,18 @@ class Script:
         except Exception as e:
             print(f"Error downloading file: {e}")
 
-# Usage
-options = {
-    'district': 'Austin ISD',
-    'program': 'STAAR Alternate 2 EOC',
-    'report': 'Standard Summary',
-    'administration': ['Spring 2023', 'Spring 2015', 'Spring 2022', 'Spring 2016', 'Spring 2021', 'Spring 2017'],
-    'subject': ['English I'],
-    'grade': [],
-    'version': '',
-    'cluster': [],
-    'download_dir': '/Users/gjimenezga/Desktop/RA/dataAutomation'
-}
+if __name__ == "__main__":
+    options = {
+        'district': 'Austin ISD',
+        'program': 'STAAR Alternate 2 EOC',
+        'report': 'Standard Summary',
+        'administration': ['Spring 2023', 'Spring 2015', 'Spring 2022', 'Spring 2016', 'Spring 2021', 'Spring 2017'],
+        'subject': ['English I'],
+        'grade': [],
+        'version': '',
+        'cluster': [],
+        'download_dir': os.path.join(os.getcwd(), 'downloads')
+    }
 
 script = Script(options)
 script.run()
