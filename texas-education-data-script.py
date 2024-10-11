@@ -506,7 +506,7 @@ if __name__ == "__main__":
         'grade': [],
         'version': '',
         'cluster': [],
-        'download_dir': os.path.join(os.getcwd(), 'reports')
+        'download_dir': os.path.join(os.getcwd(), 'downloads')
     }
 
 script = Script(options)
