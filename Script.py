@@ -4,8 +4,51 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-
+import threading
+from queue import Queue
 import time
+from typing import Dict, List
+
+class DownloadWorker(threading.Thread):
+    def __init__(self, task_queue: Queue, download_dir: str):
+        """
+        Initialize a worker thread for downloading reports.
+        
+        Args:
+            task_queue (Queue): Queue containing download tasks
+            download_dir (str): Base directory for downloads
+        """
+        threading.Thread.__init__(self)
+        self.task_queue = task_queue
+        self.download_dir = download_dir
+
+    def run(self):
+        while True:
+            try:
+                # Get task from queue
+                options = self.task_queue.get()
+                if options is None:  # Poison pill to stop thread
+                    break
+                    
+                # Create thread-specific download directory
+                thread_dir = os.path.join(
+                    self.download_dir, 
+                    f"thread_{threading.current_thread().name}"
+                )
+                os.makedirs(thread_dir, exist_ok=True)
+                options['download_dir'] = thread_dir
+                
+                # Create new Script instance and run
+                script = Script(options)
+                try:
+                    script.run()
+                finally:
+                    script.driver.quit()
+                    
+            except Exception as e:
+                print(f"Error in worker thread {self.name}: {e}")
+            finally:
+                self.task_queue.task_done()
 
 class Script:
     def __init__(self, options):
@@ -20,7 +63,7 @@ class Script:
         # Set up Chrome options for WebDriver
         chrome_options = webdriver.ChromeOptions()
         prefs = {
-            "download.default_directory": self.options['download_dir'], # Directory for downloaded files
+            "download.default_directory": os.path.join(os.getcwd(), 'downloads'), # Directory for downloaded files
             "download.prompt_for_download": False, # Do not prompt for downloads
             "directory_upgrade": True, # Allow directory upgrades
             "safebrowsing.enabled": True # Enable safe browsing
@@ -496,18 +539,77 @@ class Script:
         except Exception as e:
             print(f"Error downloading file: {e}")
 
+def run_queries(queries: List[Dict], num_threads: int = 3):
+        """
+        Download multiple reports concurrently.
+        
+        Args:
+            queries (List[Dict]): List of queries to process
+            num_threads (int): Number of concurrent download threads
+        """
+        # Create base download directory
+        base_download_dir = os.path.join(os.getcwd(), 'downloads')
+        os.makedirs(base_download_dir, exist_ok=True)
+        
+        # Create task queue
+        task_queue = Queue()
+        
+        # Create and start worker threads
+        workers = []
+        for i in range(min(num_threads, len(queries))):
+            worker = DownloadWorker(task_queue, base_download_dir)
+            worker.daemon = True
+            worker.start()
+            workers.append(worker)
+        
+        # Add all queries to the task queue
+        for query in queries:
+            task_queue.put(query)
+        
+        # Add poison pills to stop workers
+        for _ in range(len(workers)):
+            task_queue.put(None)
+        
+        # Wait for all tasks to complete
+        task_queue.join()
+        
+        # Wait for all threads to finish
+        for worker in workers:
+            worker.join()
+    
+
 if __name__ == "__main__":
-    options = {
+    queries = [
+        {
         'district': 'Austin ISD',
-        'program': 'STAAR Alternate 2 EOC',
-        'report': 'Standard Summary',
+        'program': 'STAAR 3-8',
+        'report': 'Group Summary: Performance Levels & Reporting Categories',
         'administration': ['Spring 2023', 'Spring 2015', 'Spring 2022', 'Spring 2016', 'Spring 2021', 'Spring 2017'],
-        'subject': ['English I'],
-        'grade': [],
+        'subject': ['Reading', 'Mathematics'],
+        'grade': ['Grade 5', 'Grade 7'],
         'version': '',
         'cluster': [],
-        'download_dir': os.path.join(os.getcwd(), 'downloads')
-    }
+        },
+        {
+            'district': 'Dallas ISD',
+            'program': 'STAAR Alternate 2 EOC',
+            'report': 'Standard Summary',
+            'administration': ['Spring 2023'],
+            'subject': ['Algebra I'],
+            'grade': [],
+            'version': '',
+            'cluster': []
+        },
+        {
+            'district': 'El Paso Academy',
+            'program': 'TELPAS Alternate',
+            'report': 'Score Codes Summary',
+            'administration': ['March 2021'],
+            'subject': [],
+            'grade': ['Grade 7'],
+            'version': '',
+            'cluster': ['Beginning']
+        },
+    ]
 
-script = Script(options)
-script.run()
+run_queries(queries, 3)
