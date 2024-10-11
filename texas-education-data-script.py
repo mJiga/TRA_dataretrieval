@@ -1,3 +1,4 @@
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -9,86 +10,102 @@ import time
 
 class Script:
     def __init__(self, options):
+        self.options = options
+
         chrome_options = webdriver.ChromeOptions()
         prefs = {
-            "download.default_directory": "/Users/gjimenezga/Desktop/RA/dataAutomation",
+            "download.default_directory": self.options['download_dir'],
             "download.prompt_for_download": False,
             "directory_upgrade": True,
             "safebrowsing.enabled": True
         }
         chrome_options.add_experimental_option("prefs", prefs)
         self.driver = webdriver.Chrome(options=chrome_options)
-        self.options = options
-        
+
+        self.program_report_map = {
+            "STAAR 3-8": {
+                "Standard Constructed Response Summary": ['administration', 'grade', 'version'],
+                "Standard Combined Summary": ['administration', 'subject', 'grade'],
+                "Group Summary: Performance Levels & Reporting Categories": ['administration', 'subject', 'grade'],
+                "Standard Summary": ['administration', 'subject', 'version', 'grade'],
+                "Item Analysis Summary": ['administration', 'grade', 'subject', 'version'],
+                "Score Codes Summary": ['administration', 'grade', 'subject']
+            },
+            "STAAR 3-8 Alternate 2 3-8": {
+                'Group Summary': ['administration', 'grade', 'subject'],
+                'Score Codes Summary': ['administration', 'grade', 'subject'],
+                'Standard Summary': ['administration', 'grade', 'subject'],
+            },
+            'STAAR Alternate 2 EOC': {
+                'Group Summary: Performance Levels': ['administration', 'subject'],
+                'Score Codes Summary':['administration', 'subject'],
+                'Standard Summary':['administration', 'subject']
+            },
+            'STAAR Cumulative': {
+                'Standard Cummulative Summary': ['administration', 'grade', 'subject']
+            },
+            'STAAR EOC': {
+                'Group Summary: Performance Levels & Reporting Categories': ['administration', 'subject'],
+                'Standard Combined Summary': ['administration', 'subject'],
+                'Item Analysis Summary': ['administration', 'subject'],
+                'Score Codes Summary': ['administration', 'subject'],
+                'Standard Constructed Response Summary': ['administration', 'subject', 'version'],
+                'Standard Summary': ['administration', 'subject', 'version']
+            },
+            'TELPAS': {
+                'Cluster Summary': ['administration', 'subject', 'cluster'],
+                'Standard Summary For Grade': ['administration', 'grade'],
+                'Group Summary: Performance Levels': ['administration', 'subject', 'grade'],
+                'Score Codes Summary': ['administration', 'grade', 'subject'],
+                'Standard Summary For Cluster': ['administration', 'cluster']
+            },
+            'TELPAS Alternate': {
+                'Group Summary: Performance Levels': ['administration', 'subject', 'grade'],
+                'Score Codes Summary': ['administration', 'grade'],
+                'Standard Summary': ['administration', 'grade']
+            }
+        }
+
     def run(self):
         try:
             # Navigate to the website
             self.driver.get("https://txresearchportal.com/selections")
             print("Navigation to https://txresearchportal.com/selections successful.")
-            
-            # Call the district function
-            self.select_district(self.options['district'])
 
-            # Call the program function
+            # Dynamically select based on user-provided options
+            self.select_district(self.options['district'])
             self.select_program(self.options['program'])
             
-            # Call the report function
+            # Dynamically select report based on options
             self.select_report(self.options['report'])
-
-            # Call the administration function
-            self.select_administrations(self.options['administrations'])
-
-            # Standard Constructed Response Summary
-            # if self.check_if_grade_section():
-            #     self.select_grade(self.options['grades'])
-            #     self.select_version(self.options['version'])
-            # else:
-                # group summary, standard comined summary: subject - grade
-            # self.select_subject(self.options['subjects'])
-            # self.select_grade(self.options['grades'])
-            self.select_subject(options['subjects'])
-            self.select_cluster((options['clusters']))    
-            self.download()
-            # else:
-                # standard summary: subject - version - grade
-
-            '''
-            STAAR 3-8 - Report:
-                        Standard Constructed Response Summary: admin - grade - version
-                        group summary, standard combined summary: admin - subject - grade
-                        standard summary: admin - subject - version - grade
-                        item analysis summary: admin - grade - subject - version
-                        score codes summary: - admin - grade - subject
             
-            STAAR 3-8 - Alternate 2 3-8 - Report: Group Summary: Performance Levels, Score Codes, Standard Summary - Admin - grade - subject
+            # Dynamically handle parameters based on the selected report
+            self.handle_dynamic_parameters(self.options['report'], self.options['program'], self.options)
 
-            STAAR Alternate 2 EOC - Report: Group Summary: Performance Levels, Score Codes Summary, Standard Summary - Admin - Subject
-
-            STAAR Cumulative - Report: Standard Cummulative Summary - Admin - Grade - Subject
-
-            STAAR EOC - Report:
-                        Group Summary, Standard Combined Summary, item analysis summary, score codes summary - admin - subject
-                        standard constructed response summary, standard summary - subject - version
-
-            TELPAS - Report:
-                     Cluster summary - admin - subject - cluster
-                     standard summary for grade, group summary: performance levels - admin - grade
-                     score codes summary - admin - grade - subject  
-                     standard summary for cluster - admin - cluster
-
-            TELPAS Alternate - Report:
-                            Group Summary: Performance Levels - admin - subject - grade
-                            Score codes summary, standard summary - admin - grade
-
-
-
-
-            '''
+            self.download()
 
         finally:
             # Close the browser
             time.sleep(5)
             self.driver.quit()
+
+    def handle_dynamic_parameters(self, report, program, options):
+        if program in self.program_report_map and report in self.program_report_map[program]:
+            required_params = self.program_report_map[program][report]
+
+            for param in required_params:
+
+                if param in options:
+                    method = getattr(self, f"select_{param}", None)
+
+                    if method:
+                        method(options[param])
+                    else:
+                        print(f"Selection method for {param} not defined.")
+                else:
+                    print(f"Parameter {param} not provided for {program}.")
+
+
 
     def select_district(self, district):
         # Search and select district
@@ -165,7 +182,7 @@ class Script:
         except Exception as e:
             print(f"Error selecting report '{report}': {str(e)}")
 
-    def select_administrations(self, administrations):
+    def select_administration(self, administrations):
         try:
             # Find the 'Select the Administrations' section
             administrations_section = WebDriverWait(self.driver, 10).until(
@@ -396,6 +413,7 @@ class Script:
 
             # Click the download button
             download_button.click()
+            time.sleep(3) 
             print('File downloaded succesfully')
 
         except Exception as e:
@@ -404,13 +422,14 @@ class Script:
 # Usage
 options = {
     'district': 'Austin ISD',
-    'program': 'TELPAS',
-    'report': 'Cluster Summary',
-    'administrations': ['March 2024'],
-    'subjects': ['Listening'],
-    'grades': ['Grade 3'],
-    'version': 'STAAR Spanish',
-    'clusters': ['Grade K-2']
+    'program': 'STAAR Alternate 2 EOC',
+    'report': 'Standard Summary',
+    'administration': ['Spring 2023', 'Spring 2015', 'Spring 2022', 'Spring 2016', 'Spring 2021', 'Spring 2017'],
+    'subject': ['English I'],
+    'grade': [],
+    'version': '',
+    'cluster': [],
+    'download_dir': '/Users/gjimenezga/Desktop/RA/dataAutomation'
 }
 
 script = Script(options)
