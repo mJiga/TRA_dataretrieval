@@ -4,6 +4,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
+import time
 import threading
 from queue import Queue
 import time
@@ -174,33 +176,74 @@ class Script:
 
     def select_district(self, district):
         """
-        Selects the specified district from the input field and clicks the checkbox.
-
+        Selects the specified district by typing the name, clicking search, and selecting the first checkbox in the results table.
         Args:
             district (str): The name of the district to select.
         """
-
-        # Locate the district search input and enter the district name
-        search_input = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Enter a Campus or District Name or CDC code']"))
-        )
-
-        search_input.send_keys(district)
-        search_input.send_keys(Keys.RETURN)
+        try:
+            # Locate and clear the search input
+            print("Locating search input...")
+            search_input = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Enter a Campus or District Name or CDC code']"))
+            )
+            search_input.clear()
+            print("Search input cleared.")
+            
+            # Type the district name
+            search_input.send_keys(district)
+            print(f"Typed district name: {district}")
+            time.sleep(1)  # Short pause after typing
+            
+            # Click the search button
+            print("Locating search button...")
+            search_button_selector = ("button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedInherit."
+                                    "MuiButton-sizeMedium.MuiButton-containedSizeMedium.MuiButton-colorInherit[type='submit']")
+            search_button = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, search_button_selector))
+            )
+            print("Search button found. Attempting to click...")
+            search_button.click()
+            print("Search button clicked.")
+            
+            # Wait for the results table to appear
+            print("Waiting for results table...")
+            table_selector = "div.MuiTableContainer-root.selections-table.selections-div"
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, table_selector))
+            )
+            print("Results table found.")
+            
+            # Find the first checkbox within the results table
+            print("Locating first checkbox in results...")
+            checkbox_selector = f"{table_selector} input.PrivateSwitchBase-input[type='checkbox']"
+            checkbox = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, checkbox_selector))
+            )
+            print("First checkbox found. Scrolling into view...")
+            
+            # Scroll the checkbox into view
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
+            time.sleep(1)  # Wait for the scroll to complete
+            
+            # Click the checkbox
+            print("Attempting to click checkbox...")
+            checkbox.click()
+            print(f"First checkbox for '{district}' search clicked successfully.")
         
-        # Find and click the first checkbox corresponding to the district
-        checkbox_selector = "span.MuiButtonBase-root.MuiCheckbox-root[aria-label^='Select district']"
-        first_checkbox = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, checkbox_selector))
-        )
+        except TimeoutException as e:
+            print(f"Timeout occurred while selecting district '{district}': {str(e)}")
+            print("Last known action: " + self.driver.current_url)
+        except NoSuchElementException as e:
+            print(f"Element not found while selecting district '{district}': {str(e)}")
+            print("Last known action: " + self.driver.current_url)
+        except ElementClickInterceptedException as e:
+            print(f"Click intercepted while selecting district '{district}': {str(e)}")
+            print("Last known action: " + self.driver.current_url)
+        except Exception as e:
+            print(f"An unexpected error occurred while selecting district '{district}': {str(e)}")
+            print("Last known action: " + self.driver.current_url)
 
-        # Scroll the checkbox into view
-        self.driver.execute_script("arguments[0].scrollIntoView(true);", first_checkbox)
-        time.sleep(1)  # Wait for the scroll to complete
-
-        # Click the checkbox
-        first_checkbox.click()
-        print(f"{district} clicked successfully.")
+        print("Function execution completed.")
 
     def select_program(self, program):
         try:
@@ -629,4 +672,4 @@ def load_queries():
 
 if __name__ == "__main__":
     queries = load_queries()
-    run_queries(queries, 4)
+    run_queries(queries, 5)
