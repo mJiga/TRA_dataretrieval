@@ -30,13 +30,13 @@ class DownloadWorker(threading.Thread):
                 if options is None:  # Poison pill to stop thread
                     break
                     
-                # Create thread-specific download directory
-                thread_dir = os.path.join(
-                    self.download_dir, 
-                    f"thread_{threading.current_thread().name}"
-                )
-                os.makedirs(thread_dir, exist_ok=True)
-                options['download_dir'] = thread_dir
+                # # Create thread-specific download directory
+                # thread_dir = os.path.join(
+                #     self.download_dir, 
+                #     f"thread_{threading.current_thread().name}"
+                # )
+                # os.makedirs(thread_dir, exist_ok=True)
+                # options['download_dir'] = thread_dir
                 
                 # Create new Script instance and run
                 script = Script(options)
@@ -576,40 +576,57 @@ def run_queries(queries: List[Dict], num_threads: int = 3):
         # Wait for all threads to finish
         for worker in workers:
             worker.join()
-    
+
+import csv
+def load_queries():
+    """
+    Function that reads an input csv file and loads a querie.
+
+    Returns:
+        List[dict]: A list of dictionaries containing query data.
+    """
+
+    with open('my.csv', mode='r') as file:
+        queries = []
+
+        csv_reader = csv.reader(file)
+
+        # Get the header row
+        header = next(csv_reader)
+
+        # Loop through the rows
+        for row in csv_reader:
+            district = row[0] if row[0] else ''
+            if district == '':
+                continue
+            program = row[1]
+            report = row[2]
+        
+            # Convert semicolon-separated strings into lists
+            administration = row[3].split(';') if row[3] else []
+            subject = row[4].split(';') if row[4] else []
+            grade = row[5].split(';') if row[5] else []
+            version = row[6] if row[6] else ''
+            cluster = row[7].split(';') if row[7] else []
+            
+            # Create the dictionary
+            query = {
+                'district': district,
+                'program': program,
+                'report': report,
+                'administration': administration,
+                'subject': subject,
+                'grade': grade,
+                'version': version,
+                'cluster': cluster
+            }
+
+            # Append the query
+            queries.append(query)
+            print(f'Query {len(queries)} loaded: {query}')
+
+        return queries
 
 if __name__ == "__main__":
-    queries = [
-        {
-        'district': 'Austin ISD',
-        'program': 'STAAR 3-8',
-        'report': 'Group Summary: Performance Levels & Reporting Categories',
-        'administration': ['Spring 2023', 'Spring 2015', 'Spring 2022', 'Spring 2016', 'Spring 2021', 'Spring 2017'],
-        'subject': ['Reading', 'Mathematics'],
-        'grade': ['Grade 5', 'Grade 7'],
-        'version': '',
-        'cluster': [],
-        },
-        {
-            'district': 'Dallas ISD',
-            'program': 'STAAR Alternate 2 EOC',
-            'report': 'Standard Summary',
-            'administration': ['Spring 2023'],
-            'subject': ['Algebra I'],
-            'grade': [],
-            'version': '',
-            'cluster': []
-        },
-        {
-            'district': 'El Paso Academy',
-            'program': 'TELPAS Alternate',
-            'report': 'Score Codes Summary',
-            'administration': ['March 2021'],
-            'subject': [],
-            'grade': ['Grade 7'],
-            'version': '',
-            'cluster': ['Beginning']
-        },
-    ]
-
-run_queries(queries, 3)
+    queries = load_queries()
+    run_queries(queries, 4)
