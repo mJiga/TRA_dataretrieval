@@ -670,6 +670,9 @@ def load_queries():
 
         return queries
 
+from Processing import processing
+
 if __name__ == "__main__":
     queries = load_queries()
     run_queries(queries, 5)
+    processing()
