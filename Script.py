@@ -141,8 +141,11 @@ class Script:
             # Dynamically handle parameters based on the selected report
             self.handle_dynamic_parameters(self.options['report'], self.options['program'], self.options)
 
+            # Apply filters
+            self.apply_filters()
+
             # Trigger the download process
-            self.download()
+            self.download(self.options['district'], self.options['administration'])
 
         finally:
             # Ensure the browser is closed after the operation
@@ -176,74 +179,102 @@ class Script:
 
     def select_district(self, district):
         """
-        Selects the specified district by typing the name, clicking search, and selecting the first checkbox in the results table.
+        Selects the specified district by calling the helper _search function.
         Args:
-            district (str): The name of the district to select.
+            district (list[str]): The names of the districts to select.
         """
         try:
-            # Locate and clear the search input
-            print("Locating search input...")
-            search_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Enter a Campus or District Name or CDC code']"))
-            )
-            search_input.clear()
-            print("Search input cleared.")
+            search_again = False
+            for dis in district:
+                try:
+                    print(f"\nProcessing district: {dis}")
+                    
+                    # If not the first district, click the new search button
+                    if search_again:
+                        print("Clicking new search button to return to search page...")
+                        new_search_button = WebDriverWait(self.driver, 10).until(
+                            EC.element_to_be_clickable((By.CSS_SELECTOR, 
+                                "div.MuiGrid-container button.MuiLink-button[aria-label='Search Again']"))
+                        )
+                        
+                        # Scroll parent div into view first
+                        parent_div = self.driver.find_element(By.CSS_SELECTOR, "div.MuiGrid-container")
+                        self.driver.execute_script("arguments[0].scrollIntoView(true);", parent_div)
+                        time.sleep(1)
+                        new_search_button.click()
+                        time.sleep(2)  # Wait for page to load
+                    
+                    # Search for and select the current district
+                    self._search(dis)
+                    search_again = True
+                    
+                except Exception as e:
+                    print(f"Error processing district '{dis}': {str(e)}")
+                    # Continue with next district even if current one fails
+                    continue
             
-            # Type the district name
-            search_input.send_keys(district)
-            print(f"Typed district name: {district}")
-            time.sleep(1)  # Short pause after typing
-            
-            # Click the search button
-            print("Locating search button...")
-            search_button_selector = ("button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedInherit."
-                                    "MuiButton-sizeMedium.MuiButton-containedSizeMedium.MuiButton-colorInherit[type='submit']")
-            search_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, search_button_selector))
-            )
-            print("Search button found. Attempting to click...")
-            search_button.click()
-            print("Search button clicked.")
-            
-            # Wait for the results table to appear
-            print("Waiting for results table...")
-            table_selector = "div.MuiTableContainer-root.selections-table.selections-div"
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, table_selector))
-            )
-            print("Results table found.")
-            
-            # Find the first checkbox within the results table
-            print("Locating first checkbox in results...")
-            checkbox_selector = f"{table_selector} input.PrivateSwitchBase-input[type='checkbox']"
-            checkbox = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, checkbox_selector))
-            )
-            print("First checkbox found. Scrolling into view...")
-            
-            # Scroll the checkbox into view
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
-            time.sleep(1)  # Wait for the scroll to complete
-            
-            # Click the checkbox
-            print("Attempting to click checkbox...")
-            checkbox.click()
-            print(f"First checkbox for '{district}' search clicked successfully.")
-        
-        except TimeoutException as e:
-            print(f"Timeout occurred while selecting district '{district}': {str(e)}")
-            print("Last known action: " + self.driver.current_url)
-        except NoSuchElementException as e:
-            print(f"Element not found while selecting district '{district}': {str(e)}")
-            print("Last known action: " + self.driver.current_url)
-        except ElementClickInterceptedException as e:
-            print(f"Click intercepted while selecting district '{district}': {str(e)}")
-            print("Last known action: " + self.driver.current_url)
+            print("All districts processed successfully.")
+
         except Exception as e:
-            print(f"An unexpected error occurred while selecting district '{district}': {str(e)}")
+            print(f"An unexpected error occurred while processing districts: {str(e)}")
             print("Last known action: " + self.driver.current_url)
 
-        print("Function execution completed.")
+        print("District selection completed.")
+
+    def _search(self, dis):
+        """
+        Selects the specified district by typing the name, clicking search, and selecting the first checkbox in the results table.
+        Args:
+            dis (str): The name of the district
+        """
+        # Locate and clear the search input
+        print("Locating search input...")
+        search_input = WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Enter a Campus or District Name or CDC code']"))
+        )
+        search_input.clear()
+        print("Search input cleared.")
+        
+        # Type the district name
+        search_input.send_keys(dis)
+        print(f"Typed district name: {dis}")
+        time.sleep(1)  # Short pause after typing
+        
+        # Click the search button
+        print("Locating search button...")
+        search_button_selector = ("button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedInherit."
+                                "MuiButton-sizeMedium.MuiButton-containedSizeMedium.MuiButton-colorInherit[type='submit']")
+        search_button = WebDriverWait(self.driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, search_button_selector))
+        )
+        print("Search button found. Attempting to click...")
+        search_button.click()
+        print("Search button clicked.")
+        
+        # Wait for the results table to appear
+        print("Waiting for results table...")
+        table_selector = "div.MuiTableContainer-root.selections-table.selections-div"
+        WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, table_selector))
+        )
+        print("Results table found.")
+        
+        # Find the first checkbox within the results table
+        print("Locating first checkbox in results...")
+        checkbox_selector = f"{table_selector} input.PrivateSwitchBase-input[type='checkbox']"
+        checkbox = WebDriverWait(self.driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, checkbox_selector))
+        )
+        print("First checkbox found. Scrolling into view...")
+        
+        # Scroll the checkbox into view
+        self.driver.execute_script("arguments[0].scrollIntoView(true);", checkbox)
+        time.sleep(1)  # Wait for the scroll to complete
+        
+        # Click the checkbox
+        print("Attempting to click checkbox...")
+        checkbox.click()
+        print(f"First checkbox for '{dis}' search clicked successfully.")
 
     def select_program(self, program):
         try:
@@ -566,23 +597,93 @@ class Script:
         except Exception as e:
             print(f"Error in select_clusters: {str(e)}")
 
-    def download(self):
+    def apply_filters(self):
+        """
+        Applies filters for the selected report.
+        """
+        try:
+            # Find the View Selections button using the ID
+            view_selections = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.ID, "selectionsSubmitButton"))
+            )
+            view_selections.click()
+
+            # Wait and click the Breakdown button
+            breakdown_button = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Breakdown')]"))
+            )
+            breakdown_button.click()
+
+            # Wait for dialog to be visible and find checkboxes by their label text
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//div[contains(text(), 'Breakdown by Demographic')]"))
+            )
+
+            # Find and click Ethnicity checkbox
+            ethnicity_checkbox = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//label[normalize-space()='Ethnicity']/input[@type='checkbox'] | //label[normalize-space()='Ethnicity']"))
+            )
+            if not ethnicity_checkbox.is_selected():
+                ethnicity_checkbox.click()
+
+            # Find and click Economically Disadvantaged checkbox
+            econ_checkbox = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//label[normalize-space()='Economically Disadvantaged']/input[@type='checkbox'] | //label[normalize-space()='Economically Disadvantaged']"))
+            )
+            if not econ_checkbox.is_selected():
+                econ_checkbox.click()
+
+            # Click the Apply button
+            apply_button = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[text()='Apply']"))
+            )
+            apply_button.click()
+
+        except Exception as e:
+            print(f"Error applying filters: {e}")
+
+    def download(self, name, admin):
         """
         Initiates the download of the selected report.
         """
         try:
-            # Find the download button (use the class name from your example)
-            download_button = self.driver.find_element(By.CLASS_NAME, "MuiRequestButton-root")
-
-            # Click the download button
+            # Click Download button
+            download_button = WebDriverWait(self.driver, 5).until(
+                EC.visibility_of_element_located((By.XPATH, "//button[contains(text(), 'Download')]"))
+            )
             download_button.click()
-            time.sleep(3) 
-            print('File downloaded succesfully')
+            time.sleep(2)  # Wait for modal
 
+            # Rename file
+            input_field = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 
+                    "input.MuiInputBase-input.MuiOutlinedInput-input.MuiInputBase-inputSizeSmall"))
+            )
+            input_field.send_keys(Keys.CONTROL + "a")
+            input_field.send_keys(Keys.DELETE)
+            date = ', '.join(admin)
+            input_field.send_keys(f'{name}_{date}')
+
+            # Click dropdown and select CSV
+            dropdown = self.driver.find_element(By.CSS_SELECTOR, "div[role='button'][aria-haspopup='listbox']")
+            dropdown.click()
+            time.sleep(1)
+            
+            csv_option = self.driver.find_element(By.CSS_SELECTOR, "li[data-value='csv']")
+            csv_option.click()
+            time.sleep(1)
+
+            # Click final download button
+            download_button = self.driver.find_element(By.XPATH, "//button[text()='DOWNLOAD']")
+            download_button.click()
+            time.sleep(3)
+
+            print('File downloaded successfully')
         except Exception as e:
             print(f"Error downloading file: {e}")
 
 def run_queries(queries: List[Dict], num_threads: int = 3):
+        
         """
         Download multiple reports concurrently.
         
@@ -629,7 +730,7 @@ def load_queries():
         List[dict]: A list of dictionaries containing query data.
     """
 
-    with open('my.csv', mode='r') as file:
+    with open('my3.csv', mode='r') as file:
         queries = []
 
         csv_reader = csv.reader(file)
@@ -639,8 +740,8 @@ def load_queries():
 
         # Loop through the rows
         for row in csv_reader:
-            district = row[0] if row[0] else ''
-            if district == '':
+            district = row[0].split(';') if row[0] else []
+            if not district:
                 continue
             program = row[1]
             report = row[2]
@@ -674,5 +775,6 @@ from Processing import processing
 
 if __name__ == "__main__":
     queries = load_queries()
-    run_queries(queries, 5)
+    run_queries(queries, 1)
+    # DATA CLEANING STARTING...
     processing()
