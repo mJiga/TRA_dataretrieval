@@ -59,10 +59,13 @@ District,Program,Report,Administration,Subject,Grade,Version,Cluster
 
 2. Fill in the CSV with your desired queries. Example row:
 ```
-El Paso ISD,B,STAAR 3-8,Group Summary: Performance Levels & Reporting Categories,March 2021;April 2021,Mathematics;Reading,3;4;5
+El Paso ISD,STAAR 3-8,Group Summary: Performance Levels & Reporting Categories,March 2021;April 2021,Mathematics;Reading,3;4;5
+Ysleta ISD,STAAR 3-8,Group Summary: Performance Levels & Reporting Categories,March 2021;April 2021,Mathematics;Reading,3;4;5
+New District,STAAR 3-8,Group Summary: Performance Levels & Reporting Categories,March 2021;April 2021,Mathematics;Reading,3;4;5
 ```
 
 Note: Use semicolons (;) to separate multiple values within a single field.
+Note: (,) represent cell division.
 
 ## Usage
 
