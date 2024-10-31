@@ -642,12 +642,12 @@ class Script:
         except Exception as e:
             print(f"Error applying filters: {e}")
 
-    def download(self, name, admin):
+    def download(self, name, admin, timeout=10):
         """
         Initiates the download of the selected report.
         """
         try:
-            # Click Download button
+        # Click Download button
             download_button = WebDriverWait(self.driver, 5).until(
                 EC.visibility_of_element_located((By.XPATH, "//button[contains(text(), 'Download')]"))
             )
@@ -664,21 +664,68 @@ class Script:
             date = ', '.join(admin)
             input_field.send_keys(f'{name}_{date}')
 
-            # Click dropdown and select CSV
-            dropdown = self.driver.find_element(By.CSS_SELECTOR, "div[role='button'][aria-haspopup='listbox']")
-            dropdown.click()
-            time.sleep(1)
-            
-            csv_option = self.driver.find_element(By.CSS_SELECTOR, "li[data-value='csv']")
-            csv_option.click()
-            time.sleep(1)
+            try:
+                # Wait for and locate the outer div
+                outer_div = WebDriverWait(self.driver, timeout).until(
+                    EC.presence_of_element_located((
+                        By.CSS_SELECTOR,
+                        'div.MuiInputBase-root.MuiOutlinedInput-root.MuiInputBase-colorPrimary.MuiInputBase-sizeSmall.css-1gnoy6z'
+                    ))
+                )
+                
+                # Find and click the inner div to open dropdown
+                inner_div = outer_div.find_element(
+                    By.CSS_SELECTOR,
+                    'div.MuiSelect-select.MuiSelect-outlined.MuiInputBase-input.MuiOutlinedInput-input.MuiInputBase-inputSizeSmall.css-gyb3x5'
+                )
+                inner_div.click()
+                
+                # Wait for dropdown menu to appear and select CSV option
+                # Try multiple possible selectors for the CSV option
+                try:
+                    csv_option = WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located((
+                            By.XPATH,
+                            "//li[contains(@class, 'MuiMenuItem-root') and contains(text(), 'CSV')]"
+                        ))
+                    )
+                except TimeoutException:
+                    # Alternative approach using value attribute
+                    csv_option = WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located((
+                            By.CSS_SELECTOR,
+                            "li[data-value='csv']"
+                        ))
+                    )
+                
+                # Click the CSV option
+                csv_option.click()
+                
+                # Wait for and click the download button
+                download_button = WebDriverWait(self.driver, timeout).until(
+                    EC.element_to_be_clickable((
+                        By.CSS_SELECTOR,
+                        "button.MuiButtonBase-root.MuiButton-root.MuiButton-contained.MuiButton-containedPrimary.MuiButton-sizeSmall.MuiButton-containedSizeSmall.MuiRequestButton.MuiRequestButton-root.css-1emsfic"
+                    ))
+                )
+        
+                # Additional verification that we have the right button
+                if download_button.get_attribute("type") == "submit" and download_button.get_attribute("form") == "filename-form":
+                    download_button.click()
+                else:
+                    raise Exception("Found button does not match expected attributes")
+                return True
+                
+            except TimeoutException as e:
+                print(f"Timeout waiting for element: {str(e)}")
+                return False
+            except ElementClickInterceptedException as e:
+                print(f"Element click intercepted: {str(e)}")
+                return False
+            except Exception as e:
+                print(f"An error occurred: {str(e)}")
+                return False
 
-            # Click final download button
-            download_button = self.driver.find_element(By.XPATH, "//button[text()='DOWNLOAD']")
-            download_button.click()
-            time.sleep(3)
-
-            print('File downloaded successfully')
         except Exception as e:
             print(f"Error downloading file: {e}")
 
@@ -775,6 +822,6 @@ from Processing import processing
 
 if __name__ == "__main__":
     queries = load_queries()
-    run_queries(queries, 1)
+    run_queries(queries, 3)
     # DATA CLEANING STARTING...
     processing()
